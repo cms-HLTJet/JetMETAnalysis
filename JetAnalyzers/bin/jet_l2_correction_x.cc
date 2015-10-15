@@ -80,7 +80,7 @@ int main(int argc,char**argv)
   bool           l2l3      = cl.getValue<bool>    ("l2l3",        true);
   bool           mpv       = cl.getValue<bool>    ("mpv",         true);
   bool           delphes   = cl.getValue<bool>    ("delphes",    false);
-  int            maxFitIter= cl.getValue<int>     ("maxFitIter",   100);
+  int            maxFitIter= cl.getValue<int>     ("maxFitIter",    30);
 
   if (!cl.check()) return 0;
   cl.print();
@@ -263,7 +263,7 @@ int main(int argc,char**argv)
            if (npoints > 0)
            {
               //xmin = gabscor->GetX()[0];
-              xmin = max(gabscor->GetX()[0],3.0);
+              xmin = max(gabscor->GetX()[0],1.0);
               xmax = gabscor->GetX()[gabscor->GetN()-1];
            }
 
@@ -422,7 +422,7 @@ int main(int argc,char**argv)
                fabscor->SetParameter(5,-0.28);
              }
              else if (alg.find("calo")!=string::npos) {
-               if (xmin<6) xmin=6;
+               if (xmin<6) xmin = 1.0;
                fabscor=new TF1("fit","[0]+[1]/(pow(log10(x),[2])+[3])",xmin,xmax);
                fabscor->SetParameter(0,1.0);
                fabscor->SetParameter(1,5.0);

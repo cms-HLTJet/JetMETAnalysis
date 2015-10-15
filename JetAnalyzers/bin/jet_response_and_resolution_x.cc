@@ -106,6 +106,8 @@ int main(int argc,char**argv)
     variables.push_back("RelRsp:npv");
     variables.push_back("RelRsp:NPU");
     variables.push_back("RelRsp:TrueNPU");
+    variables.push_back("RelRsp:TrueNPU:RefPt");
+    variables.push_back("RelRsp:TrueNPU#1:RefPt");
     variables.push_back("RelRsp:RefPt");
     variables.push_back("RelRsp:JetEta");
     variables.push_back("RelRsp:JetPhi");

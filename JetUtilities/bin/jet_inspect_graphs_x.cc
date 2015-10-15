@@ -994,6 +994,7 @@ string get_range(const ObjectLoader<TGraphErrors>& gl,
             if (varname=="RelLepPt") { varname = "p_{T}^{l}/p_{T}^{jet}"; unit =""; }
             if (varname=="ThreshPt") { varname = "p_{T,raw}^{3rd}", unit = " GeV"; 
                 threshold = true; }
+            if (varname=="TrueNPU")   { varname = "TrueNPU";    unit =     ""; }
 
                 if (threshold) ssrange<<varname<<" < "<<varmax<<unit<<"    ";
                 else ssrange<<varmin<<" < "<<varname<<" < "<<varmax<<unit<<"    ";
