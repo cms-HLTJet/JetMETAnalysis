@@ -7,14 +7,15 @@
 #include "TFile.h"
 #include "TKey.h"
 #include "TTree.h"
-
+#include "TAxis.h"
+#include "TH1.h"
 #include <iostream>
 #include <assert.h>
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
 
-
+using namespace std;
 ClassImp(TProfileMDF)
 
 using std::cout;
@@ -214,7 +215,8 @@ void TProfileMDF::Add(TProfileMDF *h1, TProfileMDF *h2, Double_t c1, Double_t c2
 
 //    Reset the kCanRebin option. Otherwise SetBinContent on the overflow bin
 //    would resize the axis limits!
-   ResetBit(kCanRebin);
+   //ResetBit(TAxis::kCanExtend);
+	 TH1::SetCanExtend(kNoAxis);
 
 //   - Loop on bins (including underflows/overflows)
    vector<Int_t> coord(fAxes.size(),0);
