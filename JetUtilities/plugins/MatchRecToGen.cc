@@ -12,6 +12,7 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/makeRefToBaseProdFrom.h"
  
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -64,8 +65,8 @@ public:
 
 private:
   // member data
-  edm::InputTag srcRec_;
-  edm::InputTag srcGen_;
+  edm::EDGetTokenT<CandidateView> srcRec_;
+  edm::EDGetTokenT<CandidateView> srcGen_;
 
   std::string  moduleName_;
 
@@ -90,16 +91,16 @@ private:
 
 //______________________________________________________________________________
 MatchRecToGen::MatchRecToGen(const edm::ParameterSet& iConfig)
-  : srcRec_(iConfig.getParameter<InputTag>("srcRec"))
-  , srcGen_(iConfig.getParameter<InputTag>("srcGen"))
+  : srcRec_(consumes<CandidateView>(iConfig.getParameter<edm::InputTag>("srcRec")))
+  , srcGen_(consumes<CandidateView>(iConfig.getParameter<edm::InputTag>("srcGen")))
   , moduleName_(iConfig.getParameter<string>("@module_label"))
   , nRecTot_(0)
   , nGenTot_(0)
   , nMatchedTot_(0)
 {
-  produces<reco::CandViewMatchMap>("rec2gen");
-  produces<reco::CandViewMatchMap>("gen2rec");
-	produces<reco::CandViewMatchMap>("unmaprec");
+  produces<CandViewMatchMap>("rec2gen");
+  produces<CandViewMatchMap>("gen2rec");
+	produces<CandViewMatchMap>("unmaprec");
 }
 
 
@@ -118,8 +119,8 @@ void MatchRecToGen::produce(edm::Event& iEvent,const edm::EventSetup& iSetup)
   edm::Handle<CandidateView> rec_;
   edm::Handle<CandidateView> gen_;
   
-  iEvent.getByLabel(srcRec_,rec_);
-  iEvent.getByLabel(srcGen_,gen_);
+  iEvent.getByToken(srcRec_,rec_);
+  iEvent.getByToken(srcGen_,gen_);
   
   nRec = std::min((size_t)rec_->size(),(size_t)100);
   nGen = std::min((size_t)gen_->size(),(size_t)100);
@@ -141,9 +142,21 @@ void MatchRecToGen::produce(edm::Event& iEvent,const edm::EventSetup& iSetup)
   }
   
   // two association maps: rec2gen and gen2rec
-  auto_ptr<CandViewMatchMap> recToGenMap(new CandViewMatchMap());
-  auto_ptr<CandViewMatchMap> genToRecMap(new CandViewMatchMap());
-  auto_ptr<CandViewMatchMap> unMatchreco(new CandViewMatchMap());
+  auto_ptr<CandViewMatchMap> recToGenMap;
+  auto_ptr<CandViewMatchMap> genToRecMap;
+  auto_ptr<CandViewMatchMap> unMatchreco;
+  if(nRec==0 || nGen==0) {
+     recToGenMap.reset(new CandViewMatchMap());
+     genToRecMap.reset(new CandViewMatchMap());
+  }
+  else {
+     recToGenMap.reset(new CandViewMatchMap(
+                          edm::makeRefToBaseProdFrom(rec_->refAt(0), iEvent),
+                          edm::makeRefToBaseProdFrom(gen_->refAt(0), iEvent)));
+     genToRecMap.reset(new CandViewMatchMap(
+                          edm::makeRefToBaseProdFrom(gen_->refAt(0), iEvent),
+                          edm::makeRefToBaseProdFrom(rec_->refAt(0), iEvent)));
+  }
 
   MatchIter_t it=matchSet.begin();
   while (it!=matchSet.end()&&iRecSet.size()>0&&iGenSet.size()>0) {
@@ -157,44 +170,52 @@ void MatchRecToGen::produce(edm::Event& iEvent,const edm::EventSetup& iSetup)
       recToGenMap->insert(rec_->refAt(iRec),gen_->refAt(iGen));
       genToRecMap->insert(gen_->refAt(iGen),rec_->refAt(iRec));
       iRecSet.erase(itRec);
-      iGenSet.erase(itGen);
-    }
-    
-    ++it;
-  }
+			iGenSet.erase(itGen);
+		}
 
-  if(iRecSet.size()>0)
+		++it;
+	}
+
+	if(iRecSet.size()>0)
 	{
+		unMatchreco.reset(new CandViewMatchMap(
+					edm::makeRefToBaseProdFrom(rec_->refAt(0), iEvent),
+					edm::makeRefToBaseProdFrom(rec_->refAt(0), iEvent)));
 		for(unsigned i=0;i<nRec;i++)
 			if(iRecSet.find(i)!=iRecSet.end())
 			{
-		    unMatchreco->insert(rec_->refAt(i),rec_->refAt(i));
-		    nUnMatched++;
+				unMatchreco->insert(rec_->refAt(i),rec_->refAt(i));
+				nUnMatched++;
 			}
 	}
-  iEvent.put(recToGenMap,"rec2gen");
-  iEvent.put(genToRecMap,"gen2rec");
+
+	else{
+     unMatchreco.reset(new CandViewMatchMap());
+	}
+
+	iEvent.put(recToGenMap,"rec2gen");
+	iEvent.put(genToRecMap,"gen2rec");
 	iEvent.put(unMatchreco,"unmaprec");
-  
-  nRecTot_ += nRec;
-  nGenTot_ += nGen;
-  nMatchedTot_ += nMatched;
+
+	nRecTot_ += nRec;
+	nGenTot_ += nGen;
+	nMatchedTot_ += nMatched;
 }
 
 
 //______________________________________________________________________________
 void MatchRecToGen::endJob()
 {
-  stringstream ss;
-  ss<<"nMatched = "<<nMatchedTot_<<"\n"
-    <<"nRec = "<<nRecTot_<<" "
-    <<"fRec = "<<100.*(nMatchedTot_/(double)nRecTot_)<<" %\n"
-    <<"nGen = "<<nGenTot_<<" "
-    <<"fGen = "<<100.*(nMatchedTot_/(double)nGenTot_)<<" %\n";
-  edm::LogPrint("Summary")
-    <<"++++++++++++++++++++++++++++++++++++++++++++++++++"
-    <<"\n"<<moduleName_<<"(MatchRecToGen) SUMMARY:\n"<<ss.str()
-    <<"++++++++++++++++++++++++++++++++++++++++++++++++++";
+	stringstream ss;
+	ss<<"nMatched = "<<nMatchedTot_<<"\n"
+		<<"nRec = "<<nRecTot_<<" "
+		<<"fRec = "<<100.*(nMatchedTot_/(double)nRecTot_)<<" %\n"
+		<<"nGen = "<<nGenTot_<<" "
+		<<"fGen = "<<100.*(nMatchedTot_/(double)nGenTot_)<<" %\n";
+	edm::LogPrint("Summary")
+		<<"++++++++++++++++++++++++++++++++++++++++++++++++++"
+		<<"\n"<<moduleName_<<"(MatchRecToGen) SUMMARY:\n"<<ss.str()
+		<<"++++++++++++++++++++++++++++++++++++++++++++++++++";
 }
 
 

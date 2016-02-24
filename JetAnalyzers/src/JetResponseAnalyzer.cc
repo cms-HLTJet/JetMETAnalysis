@@ -57,7 +57,8 @@ using namespace std;
 // class definition
 ////////////////////////////////////////////////////////////////////////////////
 
-class JetResponseAnalyzer : public edm::EDAnalyzer
+//class JetResponseAnalyzer : public edm::EDAnalyzer
+class JetResponseAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>
 {
 	public:
 		// construction/destruction
@@ -74,15 +75,17 @@ class JetResponseAnalyzer : public edm::EDAnalyzer
 		// member data
 		std::string   moduleLabel_;
 
-		edm::InputTag srcRef_;
-		edm::InputTag srcJetToUncorJetMap_;
-		edm::InputTag srcRefToJetMap_;
-		edm::InputTag srcJetUnMatch_; //////////UnMatched Reco Jet!!!
-		edm::InputTag srcRefToPartonMap_;
-		edm::InputTag srcRhos_;
-		edm::InputTag srcRho_;
-		edm::InputTag srcRhoHLT_;
-		edm::InputTag srcVtx_;
+		edm::EDGetTokenT<reco::CandidateView> srcRef_;
+		edm::EDGetTokenT<reco::CandViewMatchMap> srcJetToUncorJetMap_;
+		edm::EDGetTokenT<reco::CandViewMatchMap> srcRefToJetMap_;
+		edm::EDGetTokenT<reco::CandViewMatchMap> srcJetUnMatch_; //////////UnMatched Reco Jet!!!
+		edm::EDGetTokenT<reco::JetMatchedPartonsCollection> srcRefToPartonMap_;
+		edm::EDGetTokenT<vector<double>> srcRhos_;
+		edm::EDGetTokenT<double> srcRho_;
+		edm::EDGetTokenT<double> srcRhoHLT_;
+		edm::EDGetTokenT<reco::VertexCollection> srcVtx_;
+    edm::EDGetTokenT<GenEventInfoProduct> srcGenInfo_;
+    edm::EDGetTokenT<vector<PileupSummaryInfo> > srcPileupInfo_;
 
 		std::string   jecLabel_;
 
@@ -177,28 +180,30 @@ class JetResponseAnalyzer : public edm::EDAnalyzer
 
 //______________________________________________________________________________
 JetResponseAnalyzer::JetResponseAnalyzer(const edm::ParameterSet& iConfig)
-	: moduleLabel_   (iConfig.getParameter<std::string>            ("@module_label"))
-		, srcRef_        (iConfig.getParameter<edm::InputTag>                 ("srcRef"))
-		 , srcJetToUncorJetMap_  (iConfig.getParameter<edm::InputTag>    ("srcJetToUncorJetMap"))
-		 , srcRefToJetMap_(iConfig.getParameter<edm::InputTag>         ("srcRefToJetMap"))
-		 , srcJetUnMatch_ (iConfig.getParameter<edm::InputTag>          ("srcJetUnMatch"))
-		 , srcRhos_       (iConfig.getParameter<edm::InputTag>                ("srcRhos"))
-		 , srcRho_        (iConfig.getParameter<edm::InputTag>                 ("srcRho"))
-		 , srcRhoHLT_     (iConfig.getParameter<edm::InputTag>              ("srcRhoHLT"))
-		 , srcVtx_        (iConfig.getParameter<edm::InputTag>                 ("srcVtx"))
-		 , jecLabel_      (iConfig.getParameter<std::string>                 ("jecLabel"))
-		 , doComposition_ (iConfig.getParameter<bool>                   ("doComposition"))
-		 , doFlavor_      (iConfig.getParameter<bool>                        ("doFlavor"))
-		 , doJetPt_       (iConfig.getParameter<bool>                         ("doJetPt"))
-		 , doRefPt_       (iConfig.getParameter<bool>                         ("doRefPt"))
-		 , doHLT_         (iConfig.getParameter<bool>                           ("doHLT"))
+	: moduleLabel_        (iConfig.getParameter<std::string>            ("@module_label"))
+	, srcRef_             (consumes<reco::CandidateView>(iConfig.getParameter<edm::InputTag>                ("srcRef")))
+	, srcJetToUncorJetMap_(consumes<reco::CandViewMatchMap>(iConfig.getParameter<edm::InputTag>("srcJetToUncorJetMap")))
+	, srcRefToJetMap_     (consumes<reco::CandViewMatchMap>(iConfig.getParameter<edm::InputTag>     ("srcRefToJetMap")))
+	, srcJetUnMatch_      (consumes<reco::CandViewMatchMap>(iConfig.getParameter<edm::InputTag>      ("srcJetUnMatch")))
+	, srcRhos_            (consumes<vector<double>>(iConfig.getParameter<edm::InputTag>                    ("srcRhos")))
+	, srcRho_             (consumes<double>(iConfig.getParameter<edm::InputTag>                             ("srcRho")))
+	, srcRhoHLT_          (consumes<double>(iConfig.getParameter<edm::InputTag>                          ("srcRhoHLT")))
+	, srcVtx_             (consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>             ("srcVtx")))
+  , srcGenInfo_         (consumes<GenEventInfoProduct>(edm::InputTag("generator"))                                   )
+  , srcPileupInfo_      (consumes<vector<PileupSummaryInfo> >(edm::InputTag("addPileupInfo"))                        )
+	, jecLabel_      (iConfig.getParameter<std::string>                 ("jecLabel"))
+	, doComposition_ (iConfig.getParameter<bool>                   ("doComposition"))
+	, doFlavor_      (iConfig.getParameter<bool>                        ("doFlavor"))
+	, doJetPt_       (iConfig.getParameter<bool>                         ("doJetPt"))
+	, doRefPt_       (iConfig.getParameter<bool>                         ("doRefPt"))
+	, doHLT_         (iConfig.getParameter<bool>                           ("doHLT"))
 	, nRefMax_       (iConfig.getParameter<unsigned int>                 ("nRefMax"))
 	, deltaRMax_(0.0)
 	, deltaPhiMin_(3.141)
 	, deltaRPartonMax_(0.0)
 	, doBalancing_(false)
 	, getFlavorFromMap_(false)
-		, jetCorrector_(0)
+	, jetCorrector_(0)
 {
 	if (iConfig.exists("deltaRMax")) {
 		doBalancing_=false;
@@ -213,7 +218,7 @@ JetResponseAnalyzer::JetResponseAnalyzer(const edm::ParameterSet& iConfig)
 			<<" *or* deltaPhiMin (balancing)";
 
 	if (doFlavor_&&iConfig.exists("srcRefToPartonMap")) {
-		srcRefToPartonMap_=iConfig.getParameter<edm::InputTag>("srcRefToPartonMap");
+		srcRefToPartonMap_=consumes<reco::JetMatchedPartonsCollection>(iConfig.getParameter<edm::InputTag>("srcRefToPartonMap"));
 		deltaRPartonMax_  =iConfig.getParameter<double>       ("deltaRPartonMax");
 		getFlavorFromMap_=true;
 	}
@@ -232,6 +237,8 @@ JetResponseAnalyzer::JetResponseAnalyzer(const edm::ParameterSet& iConfig)
 	//if (isPFJet_)    cout<<"These are PFJets    ("<<moduleLabel_<<")"<<endl;
 	//if (isTrackJet_) cout<<"These are TrackJets ("<<moduleLabel_<<")"<<endl;
 	//if (isTauJet_)   cout<<"These are TauJets   ("<<moduleLabel_<<")"<<endl;
+  //must state that we are using the TFileService
+  usesResource("TFileService");
 }
 
 
@@ -352,28 +359,28 @@ void JetResponseAnalyzer::analyze(const edm::Event& iEvent,
 	// GENERATOR INFORMATION
 	pthat_  = 0.0;
 	weight_ = 1.0;
-	if (iEvent.getByLabel("generator",genInfo)) {
+	if (iEvent.getByToken(srcGenInfo_,genInfo)) {
 		if (genInfo->hasBinningValues()) pthat_ = (Float_t)genInfo->binningValues()[0];
 		weight_ = (Float_t)genInfo->weight();
 	}
 
 	//RHO INFORMATION
 	rho_ = 0.0;
-	if (iEvent.getByLabel(srcRho_,rho)) {
+	if (iEvent.getByToken(srcRho_,rho)) {
 		rho_ = *rho;
 	}
 
 	//HLT RHO INFORMATION
 	rho_hlt_ = 0.0;
 	if (doHLT_) {
-		if (iEvent.getByLabel(srcRhoHLT_,rho_hlt)) {
+		if (iEvent.getByToken(srcRhoHLT_,rho_hlt)) {
 			rho_hlt_ = *rho_hlt;
 		}
 	}
 
 	//ETA DEPENDENT RHO INFORMATION
 	rhos_.clear();
-	if(iEvent.getByLabel(srcRhos_,rhos)) {
+	if(iEvent.getByToken(srcRhos_,rhos)) {
 		for(unsigned int i=0; i<rhos->size(); i++) {
 			rhos_.push_back((*rhos)[i]);
 		}
@@ -384,7 +391,7 @@ void JetResponseAnalyzer::analyze(const edm::Event& iEvent,
 	//NPV INFORMATION
 	npv_ = 0;
 
-	if (iEvent.getByLabel(srcVtx_,vtx)) {
+	if (iEvent.getByToken(srcVtx_,vtx)) {
 		const reco::VertexCollection::const_iterator vtxEnd = vtx->end();
 		for (reco::VertexCollection::const_iterator vtxIter = vtx->begin(); vtxEnd != vtxIter; ++vtxIter) {
 			if (!vtxIter->isFake() && vtxIter->ndof()>=1 && fabs(vtxIter->z())<=24) {
@@ -409,7 +416,7 @@ void JetResponseAnalyzer::analyze(const edm::Event& iEvent,
 	sumpt_highpt_.clear();
 	ntrks_lowpt_.clear();
 	ntrks_highpt_.clear();
-	if (iEvent.getByLabel("addPileupInfo",puInfos)) {
+	if (iEvent.getByToken(srcPileupInfo_,puInfos)) {
 		for(unsigned int i=0; i<puInfos->size(); i++) {
 			npus_.push_back((*puInfos)[i].getPU_NumInteractions());
 			tnpus_.push_back((*puInfos)[i].getTrueNumInteractions());
@@ -439,11 +446,11 @@ void JetResponseAnalyzer::analyze(const edm::Event& iEvent,
 	}
 
 	// REFERENCES & RECOJETS
-	iEvent.getByLabel(srcRef_,               refs);
-	iEvent.getByLabel(srcJetToUncorJetMap_, jetToUncorJetMap); 
-	iEvent.getByLabel(srcRefToJetMap_,refToJetMap);
-	iEvent.getByLabel(srcJetUnMatch_, jetUnMatch); /////Unmatched reco jet config!!!
-	if (getFlavorFromMap_) iEvent.getByLabel(srcRefToPartonMap_,refToPartonMap);
+	iEvent.getByToken(srcRef_,               refs);
+	iEvent.getByToken(srcJetToUncorJetMap_, jetToUncorJetMap); 
+	iEvent.getByToken(srcRefToJetMap_,refToJetMap);
+	iEvent.getByToken(srcJetUnMatch_, jetUnMatch); /////Unmatched reco jet config!!!
+	if (getFlavorFromMap_) iEvent.getByToken(srcRefToPartonMap_,refToPartonMap);
 	if (doBalancing_&&refToJetMap->size()!=1) return;
 	size_t nRef=(nRefMax_==0) ? refs->size() : std::min(nRefMax_,refs->size());
 	for (size_t iRef=0;iRef<nRef;iRef++) {
