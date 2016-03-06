@@ -554,7 +554,8 @@ int main(int argc,char**argv)
        TGraph* grelcor;
        if(l2l3) grelcor = vabscor_eta[ieta]; //For L2L3 Corrections Together
        else grelcor = vrelcor_eta[ieta]; //For L2 & L3 Corrections Separate
-       TF1* frelcor = (TF1*)grelcor->GetListOfFunctions()->Last();
+       TF1* frelcor = (TF1*)grelcor->GetListOfFunctions()->First(); // First function should be the right one!
+       //TF1* frelcor = (TF1*)grelcor->GetListOfFunctions()->Last();
        if(frelcor!=0) {
          if(ieta==0 || (ieta==1 && delphes)) fout<<"{1 JetEta 1 JetPt "<<frelcor->GetExpFormula()<<" Correction L2Relative}"<<endl;
          double  etamin  = hl_jetpt.minimum(0,ieta);
